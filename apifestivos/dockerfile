@@ -1,0 +1,13 @@
+# Imagen base de Node.js
+FROM node:20-alpine
+# Crear carpeta para la aplicación
+WORKDIR /usr/src/app
+# Instalar dependencias (se usa el comodín para copiar package.json y package-lock.json)
+COPY package*.json ./
+RUN npm install --omit=dev
+# Copiar el código fuente completo
+COPY . .
+# Puerto donde corre la aplicación
+EXPOSE 3000
+# Comando de arranque
+CMD ["node", "src/index.js"]

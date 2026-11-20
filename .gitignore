@@ -1,0 +1,16 @@
+# Dependencias y artefactos de compilación
+**/node_modules/
+**/target/
+
+# Variables de entorno locales (se configuran en docker-compose.yml)
+**/.env
+
+# Logs y archivos temporales
+*.log
+npm-debug.log*
+
+# Configuración de editores
+.idea/
+.vscode/
+*.iml
+.DS_Store

@@ -1,0 +1,93 @@
+services:
+  # Base de datos NoSQL de la API Festivos (Node.js)
+  bdfestivos:
+    image: mongo:7
+    container_name: dockerbdfestivos
+    restart: unless-stopped
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongo_festivos_data:/data/db
+      - ./bdfestivos/iniciarBDFestivos.js:/docker-entrypoint-initdb.d/iniciarBDFestivos.js:ro
+    networks:
+      - redcalendariolaboral
+    healthcheck:
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Microservicio de festivos (Node.js + Express + MongoDB)
+  apifestivos:
+    build:
+      context: ./apifestivos
+    container_name: dockerapifestivos
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      MONGODB_URI: mongodb://bdfestivos:27017/festivos
+    ports:
+      - "3001:3000"
+    depends_on:
+      bdfestivos:
+        condition: service_healthy
+    networks:
+      - redcalendariolaboral
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Base de datos relacional del calendario laboral (PostgreSQL)
+  bdcalendario:
+    build:
+      context: ./bdcalendario
+    container_name: dockerbdcalendario
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: calendariolaboral
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: sa
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_calendario_data:/var/lib/postgresql/data
+    networks:
+      - redcalendariolaboral
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d calendariolaboral" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Microservicio de calendario laboral (Java + Spring Boot)
+  apicalendario:
+    build:
+      context: ./apicalendario
+    container_name: dockerapicalendario
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://bdcalendario:5432/calendariolaboral
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: sa
+      # Nombre del contenedor de festivos dentro de la red de Docker
+      API_FESTIVOS_URL: http://dockerapifestivos:3000/api
+    ports:
+      - "8092:8080"
+    depends_on:
+      bdcalendario:
+        condition: service_healthy
+      apifestivos:
+        condition: service_healthy
+    networks:
+      - redcalendariolaboral
+
+networks:
+  redcalendariolaboral:
+    driver: bridge
+
+volumes:
+  mongo_festivos_data:
+  postgres_calendario_data:
